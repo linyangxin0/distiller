@@ -67,30 +67,32 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def get_features(model, preprocess, dataset):
-    all_features = []
-
-    with torch.no_grad():
-        for images in dataset:
-            image = transforms.ToPILImage()(images.cpu())
-            image_input = preprocess(image).unsqueeze(0).to(device)
+    all_features = torch.tensor([]).to(device)
+    for images in dataset:
+        t_image = transforms.ToPILImage()(images.cpu())
+        image_input = preprocess(t_image).unsqueeze(0).to(device)
+        with torch.no_grad():
             features = model.encode_image(image_input)
-            all_features.append(features)
+        all_features = torch.cat((all_features, features), 0)
 
     return all_features
 
 
 def clip_validate(data, model, preprocess, train_dataset, is_feat):
     teacher_preds = torch.tensor([], device=device)
-    text_features = torch.cat(
-        [clip.tokenize(f"a photo of a {c}") for c in train_dataset.dataset.classes]).to(device)
-    text_features = model.encode_text(text_features)
+    text_input = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_dataset.dataset.classes]).to(device)
+    with torch.no_grad():
+        text_features = model.encode_text(text_input)
     text_features /= text_features.norm(dim=-1, keepdim=True)
-    image_features = get_features(model, preprocess, data)
 
+    image_features = get_features(model, preprocess, data)
     for image_feature in image_features:
+        image_feature = torch.tensor(data=[image_feature.tolist()], dtype=torch.float16).to(device)
         image_feature /= image_feature.norm(dim=-1, keepdim=True)
-        similarity = (100.0 * image_feature @ text_features.T).softmax(dim=-1)
-        values, indices = similarity[0].topk(len(train_dataset.dataset.classes))
+        similarity = (100.0 * image_feature @ text_features.T)
+        # values, indices = similarity[0].topk(len(train_dataset.dataset.classes))
+        values = similarity[0]
+
         teacher_preds = torch.cat([teacher_preds, torch.unsqueeze(values, 0)], dim=0)
 
     if is_feat:
