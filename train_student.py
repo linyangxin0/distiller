@@ -311,7 +311,7 @@ def main():
         logger.log_value('train_acc', train_acc, epoch)
         logger.log_value('train_loss', train_loss, epoch)
 
-        test_acc, tect_acc_top5, test_loss = validate(val_loader, model_s, criterion_cls, opt, clip_preprocess,True)
+        test_acc, tect_acc_top5, test_loss = validate(val_loader, model_s, criterion_cls, opt, clip_preprocess, True)
 
         logger.log_value('test_acc', test_acc, epoch)
         logger.log_value('test_loss', test_loss, epoch)

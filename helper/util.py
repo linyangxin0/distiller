@@ -81,9 +81,10 @@ def get_features(model, preprocess, dataset):
 def clip_validate(data, model, preprocess, train_dataset, is_feat):
     teacher_preds = torch.tensor([], device=device)
     text_input = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_dataset.dataset.classes]).to(device)
+
     with torch.no_grad():
         text_features = model.encode_text(text_input)
-    text_features /= text_features.norm(dim=-1, keepdim=True)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
 
     image_features = get_features(model, preprocess, data)
     for image_feature in image_features:
@@ -102,4 +103,6 @@ def clip_validate(data, model, preprocess, train_dataset, is_feat):
 
 
 if __name__ == '__main__':
+    # feat_t, logit_t = clip_validate(data=input, model=model_t, preprocess=preprocess,
+    #                                 train_dataset=train_loader, is_feat=True)
     pass
