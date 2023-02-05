@@ -78,23 +78,47 @@ def get_features(model, preprocess, dataset):
     return all_features
 
 
-def clip_validate(data, model, preprocess, train_dataset, is_feat):
+validate_directory = {}
+
+
+def clip_validate(data, model, preprocess, train_dataset, is_feat, indexes=torch.Tensor([])):
     teacher_preds = torch.tensor([], device=device)
-    text_input = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_dataset.dataset.classes]).to(device)
 
-    with torch.no_grad():
-        text_features = model.encode_text(text_input)
-        text_features /= text_features.norm(dim=-1, keepdim=True)
+    if is_feat:
+        if indexes[0].item() in validate_directory:
+            for index in indexes:
+                index = index.item()
+                teacher_preds = torch.cat([teacher_preds, torch.unsqueeze(validate_directory[index], 0)], dim=0)
+        else:
+            text_input = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_dataset.dataset.classes]).to(
+                device)
+            with torch.no_grad():
+                text_features = model.encode_text(text_input)
+                text_features /= text_features.norm(dim=-1, keepdim=True)
+            image_features = get_features(model, preprocess, data)
 
-    image_features = get_features(model, preprocess, data)
-    for image_feature in image_features:
-        image_feature = torch.tensor(data=[image_feature.tolist()], dtype=torch.float16).to(device)
-        image_feature /= image_feature.norm(dim=-1, keepdim=True)
-        similarity = (100.0 * image_feature @ text_features.T)
-        # values, indices = similarity[0].topk(len(train_dataset.dataset.classes))
-        values = similarity[0]
+            for image_feature, index in zip(image_features, indexes):
+                index = index.item()
+                image_feature = torch.tensor(data=[image_feature.tolist()], dtype=torch.float16).to(device)
+                image_feature /= image_feature.norm(dim=-1, keepdim=True)
+                similarity = (100.0 * image_feature @ text_features.T)
+                values = similarity[0]
+                teacher_preds = torch.cat([teacher_preds, torch.unsqueeze(values, 0)], dim=0)
+                validate_directory[index] = values
 
-        teacher_preds = torch.cat([teacher_preds, torch.unsqueeze(values, 0)], dim=0)
+    else:
+        text_input = torch.cat([clip.tokenize(f"a photo of a {c}") for c in train_dataset.dataset.classes]).to(device)
+        with torch.no_grad():
+            text_features = model.encode_text(text_input)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+
+        image_features = get_features(model, preprocess, data)
+        for image_feature in image_features:
+            image_feature = torch.tensor(data=[image_feature.tolist()], dtype=torch.float16).to(device)
+            image_feature /= image_feature.norm(dim=-1, keepdim=True)
+            similarity = (100.0 * image_feature @ text_features.T)
+            values = similarity[0]
+            teacher_preds = torch.cat([teacher_preds, torch.unsqueeze(values, 0)], dim=0)
 
     if is_feat:
         return [], teacher_preds
@@ -102,7 +126,7 @@ def clip_validate(data, model, preprocess, train_dataset, is_feat):
         return teacher_preds
 
 
-if __name__ == '__main__':
-    # feat_t, logit_t = clip_validate(data=input, model=model_t, preprocess=preprocess,
-    #                                 train_dataset=train_loader, is_feat=True)
-    pass
+# if __name__ == '__main__':
+#     # feat_t, logit_t = clip_validate(data=input, model=model_t, preprocess=preprocess,
+#     #                                 train_dataset=train_loader, is_feat=True)
+#     pass

@@ -122,7 +122,7 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
         with torch.no_grad():
             if opt.model_t == "clip":
                 feat_t, logit_t = clip_validate(data=input, model=model_t, preprocess=preprocess,
-                                                train_dataset=train_loader, is_feat=True)
+                                                train_dataset=train_loader, indexes=index, is_feat=True)
             else:
                 feat_t, logit_t = model_t(input, is_feat=True, preact=preact)
             feat_t = [f.detach() for f in feat_t]
