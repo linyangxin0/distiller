@@ -15,6 +15,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
+from torch.utils.tensorboard import SummaryWriter
 
 from models import model_dict
 from models.util import Embed, ConvReg, LinearEmbed
@@ -41,7 +42,7 @@ def parse_option():
     parser.add_argument('--tb_freq', type=int, default=500, help='tb frequency')
     parser.add_argument('--save_freq', type=int, default=40, help='save frequency')
     parser.add_argument('--batch_size', type=int, default=128, help='batch_size')
-    parser.add_argument('--num_workers', type=int, default=16, help='num of workers to use')
+    parser.add_argument('--num_workers', type=int, default=8, help='num of workers to use')
     parser.add_argument('--epochs', type=int, default=240, help='number of training epochs')
     parser.add_argument('--init_epochs', type=int, default=30, help='init training for two-stage methods')
 
@@ -74,7 +75,7 @@ def parse_option():
     parser.add_argument('-b', '--beta', type=float, default=None, help='weight balance for other losses')
 
     # KL distillation
-    parser.add_argument('--kd_T', type=float, default=6, help='temperature for KD distillation')
+    parser.add_argument('--kd_T', type=float, default=4, help='temperature for KD distillation')
 
     # NCE distillation
     parser.add_argument('--feat_dim', default=128, type=int, help='feature dimension')
@@ -145,6 +146,7 @@ def load_teacher(model_path, n_cls):
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     best_acc = 0
+    writer = SummaryWriter('logs')
 
     opt = parse_option()
 
@@ -317,6 +319,8 @@ def main():
         logger.log_value('test_loss', test_loss, epoch)
         logger.log_value('test_acc_top5', tect_acc_top5, epoch)
 
+        writer.add_scalar('准确率', test_acc, epoch)
+
         # save the best model
         if test_acc > best_acc:
             best_acc = test_acc
@@ -343,6 +347,7 @@ def main():
     # This best accuracy is only for printing purpose.
     # The results reported in the paper/README is from the last epoch. 
     print('best accuracy:', best_acc)
+    writer.close()
 
     # save model
     state = {
