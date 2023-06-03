@@ -46,7 +46,7 @@ class Bottleneck(nn.Module):
         res = self.shortcut(x)
         preact = torch.cat([out, res], 1) if self.stride == 2 else out+res
         out = F.relu(preact)
-        # out = F.relu(torch.cat([out, res], 1)) if self.stride == 2 else F.relu(out+res)
+        # out = F.ReLU(torch.cat([out, res], 1)) if self.stride == 2 else F.ReLU(out+res)
         if self.is_last:
             return out, preact
         else:

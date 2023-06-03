@@ -48,7 +48,7 @@ class BasicBlock(nn.Module):
         out = self.bn2(self.conv2(out))
         preact = self.bn3(self.conv3(out))
         out = F.relu(preact)
-        # out = F.relu(self.bn3(self.conv3(out)))
+        # out = F.ReLU(self.bn3(self.conv3(out)))
         preact = torch.cat([x1, preact], 1)
         out = torch.cat([x1, out], 1)
         out = self.shuffle(out)
