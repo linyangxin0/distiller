@@ -98,6 +98,7 @@ class DownBlock(nn.Module):
         self.bn5 = nn.BatchNorm2d(mid_channels)
 
         self.shuffle = ShuffleBlock()
+        self.eca = ECA(mid_channels * 2)  # 添加ECA模块，通道数为mid_channels * 2
 
     def forward(self, x):
         # left
@@ -107,6 +108,7 @@ class DownBlock(nn.Module):
         out2 = F.gelu(self.bn3(self.conv3(x)))
         out2 = self.bn4(self.conv4(out2))
         out2 = F.gelu(self.bn5(self.conv5(out2)))
+        out2 = self.eca(out2)  # 应用ECA注意力模块
         # concat
         out = torch.cat([out1, out2], 1)
         out = self.shuffle(out)
