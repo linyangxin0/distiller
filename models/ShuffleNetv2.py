@@ -3,6 +3,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class ECA(nn.Module):
+    def __init__(self, channels, k=3):
+        super(ECA, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=k, padding=(k - 1) // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x)
+        y = self.conv(y.squeeze(-1).transpose(-1, -2)).transpose(-1, -2).unsqueeze(-1)
+        y = self.sigmoid(y)
+        return x * y.expand_as(x)
+
+
 class ShuffleBlock(nn.Module):
     def __init__(self, groups=2):
         super(ShuffleBlock, self).__init__()
@@ -12,7 +27,7 @@ class ShuffleBlock(nn.Module):
         '''Channel shuffle: [N,C,H,W] -> [N,g,C/g,H,W] -> [N,C/g,g,H,w] -> [N,C,H,W]'''
         N, C, H, W = x.size()
         g = self.groups
-        return x.view(N, g, C//g, H, W).permute(0, 2, 1, 3, 4).reshape(N, C, H, W)
+        return x.view(N, g, C // g, H, W).permute(0, 2, 1, 3, 4).reshape(N, C, H, W)
 
 
 class SplitBlock(nn.Module):
@@ -40,14 +55,16 @@ class BasicBlock(nn.Module):
         self.conv3 = nn.Conv2d(in_channels, in_channels,
                                kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(in_channels)
+        self.eca = ECA(channels=in_channels)  # 添加 ECA 注意力模块
         self.shuffle = ShuffleBlock()
 
     def forward(self, x):
         x1, x2 = self.split(x)
-        out = F.relu(self.bn1(self.conv1(x2)))
+        out = F.gelu(self.bn1(self.conv1(x2)))
         out = self.bn2(self.conv2(out))
         preact = self.bn3(self.conv3(out))
-        out = F.relu(preact)
+        out = F.gelu(preact)
+        out = self.eca(out)  # 应用 ECA 注意力模块
         # out = F.ReLU(self.bn3(self.conv3(out)))
         preact = torch.cat([x1, preact], 1)
         out = torch.cat([x1, out], 1)
@@ -85,11 +102,11 @@ class DownBlock(nn.Module):
     def forward(self, x):
         # left
         out1 = self.bn1(self.conv1(x))
-        out1 = F.relu(self.bn2(self.conv2(out1)))
+        out1 = F.gelu(self.bn2(self.conv2(out1)))
         # right
-        out2 = F.relu(self.bn3(self.conv3(x)))
+        out2 = F.gelu(self.bn3(self.conv3(x)))
         out2 = self.bn4(self.conv4(out2))
-        out2 = F.relu(self.bn5(self.conv5(out2)))
+        out2 = F.gelu(self.bn5(self.conv5(out2)))
         # concat
         out = torch.cat([out1, out2], 1)
         out = self.shuffle(out)
@@ -135,7 +152,7 @@ class ShuffleNetV2(nn.Module):
         raise NotImplementedError('ShuffleNetV2 currently is not supported for "Overhaul" teacher')
 
     def forward(self, x, is_feat=False, preact=False):
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = F.gelu(self.bn1(self.conv1(x)))
         # out = F.max_pool2d(out, 3, stride=2, padding=1)
         f0 = out
         out, f1_pre = self.layer1(out)
@@ -144,7 +161,7 @@ class ShuffleNetV2(nn.Module):
         f2 = out
         out, f3_pre = self.layer3(out)
         f3 = out
-        out = F.relu(self.bn2(self.conv2(out)))
+        out = F.gelu(self.bn2(self.conv2(out)))
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         f4 = out
@@ -198,6 +215,7 @@ if __name__ == '__main__':
     net = ShuffleV2(num_classes=100)
     x = torch.randn(3, 3, 32, 32)
     import time
+
     a = time.time()
     feats, logit = net(x, is_feat=True, preact=True)
     b = time.time()
