@@ -209,7 +209,7 @@ configs = {
 
 
 def ShuffleV2(**kwargs):
-    model = ShuffleNetV2(net_size=1, **kwargs)
+    model = ShuffleNetV2(net_size=2, **kwargs)
     return model
 
 
