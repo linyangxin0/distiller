@@ -55,16 +55,16 @@ class BasicBlock(nn.Module):
         self.conv3 = nn.Conv2d(in_channels, in_channels,
                                kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(in_channels)
-        # self.eca = ECA(channels=in_channels)  # 添加 ECA 注意力模块
+        self.eca = ECA(channels=in_channels)  # 添加 ECA 注意力模块
         self.shuffle = ShuffleBlock()
 
     def forward(self, x):
         x1, x2 = self.split(x)
-        out = F.gelu(self.bn1(self.conv1(x2)))
+        out = F.relu(self.bn1(self.conv1(x2)))
         out = self.bn2(self.conv2(out))
         preact = self.bn3(self.conv3(out))
-        out = F.gelu(preact)
-        # out = self.eca(out)  # 应用 ECA 注意力模块
+        out = F.relu(preact)
+        out = self.eca(out)  # 应用 ECA 注意力模块
         # out = F.ReLU(self.bn3(self.conv3(out)))
         preact = torch.cat([x1, preact], 1)
         out = torch.cat([x1, out], 1)
@@ -98,17 +98,17 @@ class DownBlock(nn.Module):
         self.bn5 = nn.BatchNorm2d(mid_channels)
 
         self.shuffle = ShuffleBlock()
-        # self.eca = ECA(mid_channels * 2)  # 添加ECA模块，通道数为mid_channels * 2
+        self.eca = ECA(mid_channels * 2)  # 添加ECA模块，通道数为mid_channels * 2
 
     def forward(self, x):
         # left
         out1 = self.bn1(self.conv1(x))
-        out1 = F.gelu(self.bn2(self.conv2(out1)))
+        out1 = F.relu(self.bn2(self.conv2(out1)))
         # right
-        out2 = F.gelu(self.bn3(self.conv3(x)))
+        out2 = F.relu(self.bn3(self.conv3(x)))
         out2 = self.bn4(self.conv4(out2))
-        out2 = F.gelu(self.bn5(self.conv5(out2)))
-        # out2 = self.eca(out2)  # 应用ECA注意力模块
+        out2 = F.relu(self.bn5(self.conv5(out2)))
+        out2 = self.eca(out2)  # 应用ECA注意力模块
         # concat
         out = torch.cat([out1, out2], 1)
         out = self.shuffle(out)
@@ -154,7 +154,7 @@ class ShuffleNetV2(nn.Module):
         raise NotImplementedError('ShuffleNetV2 currently is not supported for "Overhaul" teacher')
 
     def forward(self, x, is_feat=False, preact=False):
-        out = F.gelu(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn1(self.conv1(x)))
         # out = F.max_pool2d(out, 3, stride=2, padding=1)
         f0 = out
         out, f1_pre = self.layer1(out)
@@ -163,7 +163,7 @@ class ShuffleNetV2(nn.Module):
         f2 = out
         out, f3_pre = self.layer3(out)
         f3 = out
-        out = F.gelu(self.bn2(self.conv2(out)))
+        out = F.relu(self.bn2(self.conv2(out)))
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         f4 = out
